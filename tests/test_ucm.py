@@ -704,3 +704,30 @@ class UCMTests(unittest.TestCase):
 
         numpy.testing.assert_allclose(
             actual_cc_park, expected_cc_park, atol=1e-6)
+
+    def test_hm_op_nodata_mask(self):
+        """UCM: test hm_op masks pixels when either cc or cc_park is nodata."""
+        from natcap.invest.urban_cooling_model import urban_cooling_model
+
+        nodata = urban_cooling_model.TARGET_NODATA
+        cc_array = numpy.array([
+            [0.6, nodata],
+            [0.4, 0.3],
+        ], dtype=numpy.float32)
+        cc_park_array = numpy.array([
+            [0.2, 0.5],
+            [nodata, 0.8],
+        ], dtype=numpy.float32)
+        green_area_sum = numpy.array([
+            [1.0, 10.0],
+            [10.0, 10.0],
+        ], dtype=numpy.float32)
+        green_area_threshold = 5.0
+
+        actual = urban_cooling_model.hm_op(
+            cc_array, green_area_sum, cc_park_array, green_area_threshold)
+        expected = numpy.array([
+            [0.6, nodata],
+            [nodata, 0.8],
+        ], dtype=numpy.float32)
+        numpy.testing.assert_allclose(actual, expected, atol=1e-6)
