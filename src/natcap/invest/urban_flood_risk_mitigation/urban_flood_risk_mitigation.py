@@ -667,6 +667,7 @@ def _calculate_damage_to_infrastructure_in_aoi(
             f"Could not find field 'Type' in {structures_vector_path}")
 
     structures_index = rtree.index.Index(interleaved=True)
+    infrastructure_lookup = {}
     for infrastructure_feature in infrastructure_layer:
         infrastructure_geometry = infrastructure_feature.GetGeometryRef()
 
@@ -681,9 +682,13 @@ def _calculate_damage_to_infrastructure_in_aoi(
 
         shapely_geometry = shapely.wkb.loads(
             bytes(infrastructure_geometry.ExportToWkb()))
+        infrastructure_fid = infrastructure_feature.GetFID()
+        infrastructure_lookup[infrastructure_fid] = (
+            shapely_geometry,
+            int(infrastructure_feature.GetField(type_index)))
 
         structures_index.insert(
-            infrastructure_feature.GetFID(), shapely_geometry.bounds)
+            infrastructure_fid, shapely_geometry.bounds)
 
     aoi_vector = gdal.OpenEx(aoi_vector_path, gdal.OF_VECTOR)
     aoi_layer = aoi_vector.GetLayer()
@@ -698,14 +703,11 @@ def _calculate_damage_to_infrastructure_in_aoi(
         total_damage = 0
         for infrastructure_fid in structures_index.intersection(
                 aoi_geometry_shapely.bounds):
-            infrastructure_feature = infrastructure_layer.GetFeature(
-                infrastructure_fid)
-            infrastructure_geometry = shapely.wkb.loads(
-                bytes(infrastructure_feature.GetGeometryRef().ExportToWkb()))
+            infrastructure_geometry, damage_type = (
+                infrastructure_lookup[infrastructure_fid])
             if aoi_geometry_prep.intersects(infrastructure_geometry):
                 intersection_geometry = aoi_geometry_shapely.intersection(
                     infrastructure_geometry)
-                damage_type = int(infrastructure_feature.GetField(type_index))
                 total_damage += (
                     intersection_geometry.area * damage_type_map[damage_type])
 

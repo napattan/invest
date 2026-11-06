@@ -1098,11 +1098,15 @@ def calculate_uhi_result_vector(
 
         LOGGER.info('Parsing building footprint geometry')
         building_shapely_polygon_lookup = dict()
+        building_energy_sav_lookup = dict()
         for poly_feat in energy_consumption_layer:
             geom = poly_feat.GetGeometryRef()
             if geom:
-                building_shapely_polygon_lookup[poly_feat.GetFID()] = (
+                fid = poly_feat.GetFID()
+                building_shapely_polygon_lookup[fid] = (
                     shapely.wkb.loads(bytes(geom.ExportToWkb())))
+                building_energy_sav_lookup[fid] = (
+                    poly_feat.GetField('energy_sav'))
 
         LOGGER.info("Constructing building footprint spatial index")
         poly_rtree_index = rtree.index.Index(
@@ -1160,8 +1164,7 @@ def calculate_uhi_result_vector(
                 if aoi_shapely_geometry_prep.intersects(
                         building_shapely_polygon_lookup[building_fid]):
                     energy_consumption_value = (
-                        energy_consumption_layer.GetFeature(
-                            building_fid).GetField('energy_sav'))
+                        building_energy_sav_lookup[building_fid])
                     if energy_consumption_value:
                         # this step lets us skip values that might be in
                         # nodata ranges that we can't help.
@@ -1453,8 +1456,9 @@ def hm_op(cc_array, green_area_sum, cc_park_array, green_area_threshold):
     """
     result = numpy.empty(cc_array.shape, dtype=numpy.float32)
     result[:] = TARGET_NODATA
-    valid_mask = ~(pygeoprocessing.array_equals_nodata(cc_array, TARGET_NODATA) &
-                   pygeoprocessing.array_equals_nodata(cc_park_array, TARGET_NODATA))
+    valid_mask = ~(
+        pygeoprocessing.array_equals_nodata(cc_array, TARGET_NODATA) |
+        pygeoprocessing.array_equals_nodata(cc_park_array, TARGET_NODATA))
     cc_mask = ((cc_array >= cc_park_array) |
                (green_area_sum < green_area_threshold))
     result[cc_mask & valid_mask] = cc_array[cc_mask & valid_mask]
